@@ -128,3 +128,28 @@
     @apply font-sans;
   }
 }
+
+body {
+  font-family: var(--font-inter), sans-serif;
+}
+
+.heading-font {
+  font-family: var(--font-space), sans-serif;
+}
+
+.tech-label {
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.input-text {
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+.subtle-text {
+  line-height: 1.7;
+  color: rgb(148 163 184);
+}
