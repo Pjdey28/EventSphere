@@ -86,7 +86,7 @@ export default function EventDetailsPage() {
       if (order.keyId !== "demo" && order.totalAmount > 0) {
         await loadRazorpayScript();
         data = await new Promise<any>((resolve, reject) => {
-          const razorpay = new (window as any).Razorpay({ key: order.keyId, amount: order.order.amount, currency: order.order.currency, name: "EventSphere", description: event.title, order_id: order.order.id, prefill: attendee, handler: async (response: any) => { try { resolve(await verifyCheckout(id, { ...response, attendee })); } catch (error) { reject(error); } }, modal: { ondismiss: () => reject(new Error("Payment cancelled")) } });
+          const razorpay = new (window as any).Razorpay({ key: order.keyId, amount: order.order.amount, currency: order.order.currency, name: "EventSphere", description: event?.title || "Event ticket", order_id: order.order.id, prefill: attendee, handler: async (response: any) => { try { resolve(await verifyCheckout(id, { ...response, attendee })); } catch (error) { reject(error); } }, modal: { ondismiss: () => reject(new Error("Payment cancelled")) } });
           razorpay.open();
         });
       } else {

@@ -18,7 +18,13 @@ const reviewSchema = new mongoose.Schema(
       max: 5
     },
 
-    comment: String
+    comment: String,
+
+    kind: {
+      type: String,
+      enum: ["review", "feedback"],
+      default: "review"
+    }
   },
   {
     timestamps: true

@@ -16,9 +16,12 @@ import {
   generateDescription,
   suggestSchedule,
   createReview,
+  getReviews,
+  createFeedback,
   requestRefund,
   decideRefund,
   networkingOptIn,
+  getNetworkingAttendees,
   getRecommendations,
 } from "../controllers/event.controller.js";
 
@@ -29,9 +32,12 @@ router.post("/ai/description", generateDescription);
 router.post("/ai/schedule", suggestSchedule);
 router.post("/recommendations", getRecommendations);
 router.post("/:id/review", createReview);
+router.get("/:id/reviews", getReviews);
+router.post("/:id/feedback", createFeedback);
 router.post("/bookings/:bookingId/refund", requestRefund);
 router.patch("/bookings/:bookingId/refund", decideRefund);
-router.post("/networking", networkingOptIn);
+router.post("/:id/networking", networkingOptIn);
+router.get("/:id/networking", getNetworkingAttendees);
 router.get("/", getAllEvents);
 router.get("/:id", getSingleEvent);
 router.put("/:id", updateEvent);

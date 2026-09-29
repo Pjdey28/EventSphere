@@ -101,6 +101,13 @@ const eventSchema = new mongoose.Schema(
 
     reminderEnabled: { type: Boolean, default: true },
 
+    networkingAttendees: [{
+      attendeeKey: String,
+      name: String,
+      linkedin: String,
+      optedInAt: Date
+    }],
+
     attendees: [
       {
         type: mongoose.Schema.Types.ObjectId,

@@ -91,6 +91,7 @@ export const getSingleEvent = async (req, res) => {
     const event = await Event.findById(req.params.id)
       .populate("organiser", "name email")
       .populate("attendees", "name email")
+      .populate("reviews")
       
 
     if (!event) {
@@ -288,11 +289,13 @@ export const verifyCheckout = async (req, res) => {
     if (existing) return res.json({ success: true, booking: existing, duplicate: true });
     const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
     const order = await razorpay.orders.fetch(razorpayOrderId);
+    const payment = await razorpay.payments.fetch(razorpayPaymentId);
+    if (!["authorized", "captured"].includes(payment.status)) return res.status(400).json({ message: "Payment has not been captured" });
     const event = await Event.findById(order.notes?.eventId || req.params.id);
     const tickets = JSON.parse(order.notes?.tickets || "[]");
     if (!event || !tickets.length) return res.status(400).json({ message: "Payment order metadata is invalid" });
     const totalAmount = tickets.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    if (Number(order.amount) !== Math.round(totalAmount * 100)) return res.status(400).json({ message: "Payment amount mismatch" });
+    if (Number(order.amount) !== Math.round(totalAmount * 100) || Number(payment.amount) !== Number(order.amount)) return res.status(400).json({ message: "Payment amount mismatch" });
     for (const item of tickets) {
       const ticket = event.ticketTypes.find((entry) => entry.name === item.ticketType);
       if (!ticket || ticket.capacity - ticket.sold < item.quantity) return res.status(400).json({ message: "Ticket capacity changed. Refund required." });
@@ -392,6 +395,19 @@ export const createReview = async (req, res) => {
   return res.status(201).json({ success: true, review });
 };
 
+export const getReviews = async (req, res) => {
+  const reviews = await Review.find({ event: req.params.id, kind: "review" }).sort({ createdAt: -1 });
+  return res.json({ success: true, reviews });
+};
+
+export const createFeedback = async (req, res) => {
+  const event = await Event.findById(req.params.id);
+  if (!event) return res.status(404).json({ message: "Event not found" });
+  if (!event.endDate || new Date(event.endDate) > new Date()) return res.status(400).json({ message: "Feedback opens after the event ends" });
+  const feedback = await Review.create({ event: event._id, rating: req.body.rating, comment: req.body.comment, kind: "feedback" });
+  return res.status(201).json({ success: true, feedback });
+};
+
 export const requestRefund = async (req, res) => {
   const booking = await Booking.findByIdAndUpdate(req.params.bookingId, { refundStatus: "requested" }, { new: true });
   if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -414,9 +430,20 @@ export const decideRefund = async (req, res) => {
 };
 
 export const networkingOptIn = async (req, res) => {
-  const user = await User.findByIdAndUpdate(req.body.userId, { linkedin: req.body.linkedin, networkingOptIn: req.body.optIn !== false }, { new: true });
-  if (!user) return res.status(404).json({ message: "User not found" });
-  return res.json({ success: true, message: "Networking preference saved" });
+  const { attendeeKey, name = "EventSphere attendee", linkedin = "", optIn = true } = req.body;
+  if (!attendeeKey) return res.status(400).json({ message: "Attendee key is required" });
+  const event = await Event.findById(req.params.id);
+  if (!event) return res.status(404).json({ message: "Event not found" });
+  event.networkingAttendees = event.networkingAttendees.filter((attendee) => attendee.attendeeKey !== attendeeKey);
+  if (optIn) event.networkingAttendees.push({ attendeeKey, name, linkedin, optedInAt: new Date() });
+  await event.save();
+  return res.json({ success: true, message: optIn ? "You are visible to event attendees" : "Networking opt-in removed" });
+};
+
+export const getNetworkingAttendees = async (req, res) => {
+  const event = await Event.findById(req.params.id).select("networkingAttendees");
+  if (!event) return res.status(404).json({ message: "Event not found" });
+  return res.json({ success: true, attendees: event.networkingAttendees.map(({ attendeeKey, ...attendee }) => attendee) });
 };
 
 export const getRecommendations = async (req, res) => {

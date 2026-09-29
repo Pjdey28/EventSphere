@@ -126,6 +126,15 @@ export const submitReview = (id: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
+export const getReviews = (id: string) => request(`/${id}/reviews`);
+
+export const submitFeedback = (id: string, body: unknown) =>
+  request(`/${id}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
 export const requestRefund = (bookingId: string) =>
   request(`/bookings/${bookingId}/refund`, { method: "POST" });
 
@@ -136,12 +145,14 @@ export const decideRefund = (bookingId: string, status: "approved" | "rejected")
     body: JSON.stringify({ status }),
   });
 
-export const saveNetworkingPreference = (body: unknown) =>
-  request("/networking", {
+export const saveNetworkingPreference = (id: string, body: unknown) =>
+  request(`/${id}/networking`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+export const getNetworkingAttendees = (id: string) => request(`/${id}/networking`);
 
 export const getRecommendations = (body: { categories?: string[]; attendedEventIds?: string[] }) =>
   request("/recommendations", {
