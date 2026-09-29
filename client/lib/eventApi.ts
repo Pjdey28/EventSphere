@@ -161,6 +161,13 @@ export const saveNetworkingPreference = (id: string, body: unknown) =>
 
 export const getNetworkingAttendees = (id: string) => request(`/${id}/networking`);
 
+export const createReminder = (id: string, remindAt?: string) =>
+  request(`/${id}/reminder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ remindAt }),
+  });
+
 export const getRecommendations = (body: { categories?: string[]; attendedEventIds?: string[] }) =>
   request("/recommendations", {
     method: "POST",

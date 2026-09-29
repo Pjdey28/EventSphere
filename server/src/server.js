@@ -4,6 +4,7 @@ import http from "http";
 import { Server } from "socket.io";
 
 import app from "./app.js";
+import { runNotificationSweep } from "./services/notification.service.js";
 
 dotenv.config();
 
@@ -22,6 +23,8 @@ mongoose.connect(process.env.MONGO_URI)
 
     server.listen(5000, () => {
         console.log("Server running on port 5000");
+        runNotificationSweep().catch((error) => console.error("Notification sweep failed", error));
+        setInterval(() => runNotificationSweep().catch((error) => console.error("Notification sweep failed", error)), 60 * 1000);
     });
 })
 .catch((err) => console.log(err));

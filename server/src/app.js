@@ -1,14 +1,16 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
 import authRoutes from "./routes/auth.routes.js";
 import eventRoutes from "./routes/event.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
+dotenv.config();
 const app = express();
 
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true
 }));
 

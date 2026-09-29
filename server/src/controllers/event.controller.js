@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import Razorpay from "razorpay";
 import crypto from "node:crypto";
 import Review from "../models/review.model.js";
+import Reminder from "../models/reminder.model.js";
 
 export const createEvent = async (req, res) => {
   try {
@@ -452,4 +453,17 @@ export const getRecommendations = async (req, res) => {
   if (categories.length) query.category = { $in: categories };
   const events = await Event.find(query).sort({ createdAt: -1 }).limit(6);
   return res.json({ success: true, recommendations: events, basis: categories.length ? "saved categories and past attendance" : "recent events until attendee preferences exist" });
+};
+
+export const createReminder = async (req, res) => {
+  const event = await Event.findById(req.params.id);
+  if (!event) return res.status(404).json({ message: "Event not found" });
+  const remindAt = req.body.remindAt ? new Date(req.body.remindAt) : new Date(new Date(event.startDate).getTime() - 24 * 60 * 60 * 1000);
+  const reminder = await Reminder.findOneAndUpdate({ user: req.user._id, event: event._id }, { user: req.user._id, event: event._id, email: req.user.email, remindAt, sent: false }, { upsert: true, new: true, setDefaultsOnInsert: true });
+  return res.json({ success: true, reminder });
+};
+
+export const getMyReminders = async (req, res) => {
+  const reminders = await Reminder.find({ user: req.user._id }).populate("event", "title startDate").sort({ remindAt: 1 });
+  return res.json({ success: true, reminders });
 };

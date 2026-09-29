@@ -36,6 +36,11 @@ const bookingSchema = new mongoose.Schema(
     attendeeName: String,
     attendeeEmail: String,
 
+    feedbackEmailSent: {
+      type: Boolean,
+      default: false
+    },
+
     checkedIn: {
       type: Boolean,
       default: false
