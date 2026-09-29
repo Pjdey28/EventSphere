@@ -400,9 +400,17 @@ export const requestRefund = async (req, res) => {
 
 export const decideRefund = async (req, res) => {
   const status = ["approved", "rejected"].includes(req.body.status) ? req.body.status : "rejected";
-  const booking = await Booking.findByIdAndUpdate(req.params.bookingId, { refundStatus: status, paymentStatus: status === "approved" ? "failed" : "paid" }, { new: true });
+  const booking = await Booking.findById(req.params.bookingId);
   if (!booking) return res.status(404).json({ message: "Booking not found" });
-  return res.json({ success: true, booking, payout: status === "approved" ? "reversed in sandbox" : "retained" });
+  if (status === "approved" && process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && !String(booking.paymentId).startsWith("demo_")) {
+    const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
+    await razorpay.payments.refund(booking.paymentId, { amount: Math.round(booking.totalAmount * 100), notes: { bookingId: String(booking._id) } });
+  }
+  booking.refundStatus = status;
+  booking.paymentStatus = status === "approved" ? "failed" : "paid";
+  await booking.save();
+  if (status === "approved") await Event.findByIdAndUpdate(booking.event, { $inc: { totalRevenue: -booking.totalAmount } });
+  return res.json({ success: true, booking, payout: status === "approved" ? "refunded through Razorpay or demo ledger" : "retained" });
 };
 
 export const networkingOptIn = async (req, res) => {

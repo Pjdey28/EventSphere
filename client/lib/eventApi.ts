@@ -156,3 +156,10 @@ export const suggestEventSchedule = (sessions: unknown[]) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessions }),
   });
+
+export const verifyCheckout = (id: string, body: unknown) =>
+  request(`/${id}/checkout/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });

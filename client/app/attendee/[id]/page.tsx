@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { completeCheckout, createCheckout, getSingleEvent, saveNetworkingPreference, submitReview, toggleWishlist } from "@/lib/eventApi";
+import { completeCheckout, createCheckout, getSingleEvent, saveNetworkingPreference, submitReview, toggleWishlist, verifyCheckout } from "@/lib/eventApi";
 import { motion } from "framer-motion";
 
 type TicketType = {
@@ -81,7 +81,17 @@ export default function EventDetailsPage() {
       if (!selectedTickets.length) throw new Error("Choose at least one ticket");
       setBusy(true);
       const order = await createCheckout(id, { tickets: selectedTickets, discountCode });
-      const data = await completeCheckout(id, { tickets: order.tickets, totalAmount: order.totalAmount, paymentId: order.order.id, attendee: { name: "Demo attendee", email: "attendee@eventsphere.test" } });
+      const attendee = { name: "Demo attendee", email: "attendee@eventsphere.test" };
+      let data;
+      if (order.keyId !== "demo" && order.totalAmount > 0) {
+        await loadRazorpayScript();
+        data = await new Promise<any>((resolve, reject) => {
+          const razorpay = new (window as any).Razorpay({ key: order.keyId, amount: order.order.amount, currency: order.order.currency, name: "EventSphere", description: event.title, order_id: order.order.id, prefill: attendee, handler: async (response: any) => { try { resolve(await verifyCheckout(id, { ...response, attendee })); } catch (error) { reject(error); } }, modal: { ondismiss: () => reject(new Error("Payment cancelled")) } });
+          razorpay.open();
+        });
+      } else {
+        data = await completeCheckout(id, { tickets: order.tickets, totalAmount: order.totalAmount, paymentId: order.order.id, attendee });
+      }
       setTicket(data.booking);
       localStorage.setItem("eventsphere-last-ticket", JSON.stringify(data.booking));
       const categories = JSON.parse(localStorage.getItem("eventsphere-saved-categories") || "[]");
@@ -92,6 +102,15 @@ export default function EventDetailsPage() {
       setBusy(false);
     }
   };
+
+  const loadRazorpayScript = () => new Promise<void>((resolve, reject) => {
+    if ((window as any).Razorpay) return resolve();
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Unable to load Razorpay Checkout"));
+    document.body.appendChild(script);
+  });
 
   const handleWishlist = async () => {
     const next = !isWishlisted;
