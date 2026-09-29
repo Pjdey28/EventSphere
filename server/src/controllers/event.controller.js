@@ -329,7 +329,14 @@ export const generateDescription = async (req, res) => {
 
 export const suggestSchedule = async (req, res) => {
   const sessions = Array.isArray(req.body.sessions) ? req.body.sessions : [];
-  return res.json({ success: true, sessions: sessions.slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))), reason: "Sessions are ordered by start time to preserve speaker availability and audience flow." });
+  if (process.env.GROQ_API_KEY && sessions.length) {
+    const { default: Groq } = await import("groq-sdk");
+    const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const completion = await client.chat.completions.create({ model: "llama-3.1-8b-instant", response_format: { type: "json_object" }, messages: [{ role: "user", content: `Order these conference sessions for speaker availability and audience flow. Return JSON with a sessions array containing the same objects in the recommended order and a reason string. Sessions: ${JSON.stringify(sessions)}` }] });
+    const suggestion = JSON.parse(completion.choices[0]?.message?.content || "{}");
+    return res.json({ success: true, sessions: suggestion.sessions || sessions, reason: suggestion.reason || "AI balanced speaker availability and audience flow." });
+  }
+  return res.json({ success: true, sessions: sessions.slice().sort((a, b) => String(a.time || a.startTime).localeCompare(String(b.time || b.startTime))), reason: "Ordered by session time as a deterministic fallback. Add GROQ_API_KEY for audience-flow reasoning." });
 };
 
 export const createReview = async (req, res) => {
@@ -359,6 +366,9 @@ export const networkingOptIn = async (req, res) => {
 };
 
 export const getRecommendations = async (req, res) => {
-  const events = await Event.find({ _id: { $ne: req.body.excludeId } }).sort({ createdAt: -1 }).limit(6);
-  return res.json({ success: true, recommendations: events, basis: "recent categories and attended events" });
+  const categories = Array.isArray(req.body.categories) ? req.body.categories.filter(Boolean) : [];
+  const query = { _id: { $nin: req.body.attendedEventIds || [] } };
+  if (categories.length) query.category = { $in: categories };
+  const events = await Event.find(query).sort({ createdAt: -1 }).limit(6);
+  return res.json({ success: true, recommendations: events, basis: categories.length ? "saved categories and past attendance" : "recent events until attendee preferences exist" });
 };

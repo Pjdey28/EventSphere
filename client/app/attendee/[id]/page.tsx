@@ -84,6 +84,8 @@ export default function EventDetailsPage() {
       const data = await completeCheckout(id, { tickets: order.tickets, totalAmount: order.totalAmount, paymentId: order.order.id, attendee: { name: "Demo attendee", email: "attendee@eventsphere.test" } });
       setTicket(data.booking);
       localStorage.setItem("eventsphere-last-ticket", JSON.stringify(data.booking));
+      const categories = JSON.parse(localStorage.getItem("eventsphere-saved-categories") || "[]");
+      if (event?.category && !categories.includes(event.category)) localStorage.setItem("eventsphere-saved-categories", JSON.stringify([...categories, event.category]));
     } catch (error: any) {
       alert(error.message || "Registration failed");
     } finally {

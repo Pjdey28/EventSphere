@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createEvent, generateEventDescription } from "@/lib/eventApi";
+import { createEvent, generateEventDescription, suggestEventSchedule } from "@/lib/eventApi";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 export default function CreateEventPage() {
@@ -33,6 +33,7 @@ export default function CreateEventPage() {
   const [faqs, setFaqs] = useState([{ question: "", answer: "" }]);
   const [aiBullets, setAiBullets] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -115,6 +116,18 @@ export default function CreateEventPage() {
       console.error(error);
     } finally {
       setAiBusy(false);
+    }
+  };
+
+  const optimizeSchedule = async () => {
+    setScheduleBusy(true);
+    try {
+      const data = await suggestEventSchedule(agenda);
+      setAgenda(data.sessions || agenda);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setScheduleBusy(false);
     }
   };
 
@@ -205,7 +218,7 @@ const itemVariants: Variants = {
           </motion.div>
 
           <motion.div variants={itemVariants} className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2"><h2 className="heading-font text-xl font-semibold text-white">Agenda</h2>{agenda.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Session title" value={item.title} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input placeholder="Time" value={item.time} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, time: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}<button type="button" onClick={() => setAgenda([...agenda, { time: "", title: "", speaker: "" }])} className="text-xs text-blue-300">+ Add session</button></div>
+            <div className="space-y-2"><div className="flex items-center justify-between"><h2 className="heading-font text-xl font-semibold text-white">Agenda</h2><button type="button" onClick={optimizeSchedule} disabled={scheduleBusy} className="text-xs font-semibold text-blue-300">{scheduleBusy ? "Optimizing..." : "Optimize schedule"}</button></div>{agenda.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Session title" value={item.title} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><div className="grid grid-cols-2 gap-2"><input placeholder="Time" value={item.time} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, time: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input placeholder="Speaker" value={item.speaker} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, speaker: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div></div>)}<button type="button" onClick={() => setAgenda([...agenda, { time: "", title: "", speaker: "" }])} className="text-xs text-blue-300">+ Add session</button></div>
             <div className="space-y-2"><h2 className="heading-font text-xl font-semibold text-white">Speakers</h2>{speakers.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Name" value={item.name} onChange={(e) => setSpeakers(speakers.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input placeholder="Role / designation" value={item.designation} onChange={(e) => setSpeakers(speakers.map((row, i) => i === index ? { ...row, designation: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}<button type="button" onClick={() => setSpeakers([...speakers, { name: "", designation: "", image: "" }])} className="text-xs text-blue-300">+ Add speaker</button></div>
             <div className="space-y-2"><h2 className="heading-font text-xl font-semibold text-white">FAQs</h2>{faqs.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Question" value={item.question} onChange={(e) => setFaqs(faqs.map((row, i) => i === index ? { ...row, question: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><textarea placeholder="Answer" value={item.answer} onChange={(e) => setFaqs(faqs.map((row, i) => i === index ? { ...row, answer: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}<button type="button" onClick={() => setFaqs([...faqs, { question: "", answer: "" }])} className="text-xs text-blue-300">+ Add FAQ</button></div>
           </motion.div>

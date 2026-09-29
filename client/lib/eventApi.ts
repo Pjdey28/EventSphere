@@ -142,3 +142,17 @@ export const saveNetworkingPreference = (body: unknown) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+export const getRecommendations = (body: { categories?: string[]; attendedEventIds?: string[] }) =>
+  request("/recommendations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export const suggestEventSchedule = (sessions: unknown[]) =>
+  request("/ai/schedule", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessions }),
+  });

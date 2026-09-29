@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getAllEvents } from "@/lib/eventApi";
+import { getAllEvents, getRecommendations } from "@/lib/eventApi";
 import { motion } from "framer-motion";
 
 type TicketType = {
@@ -29,6 +29,7 @@ type EventType = {
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventType[]>([]);
+  const [recommendations, setRecommendations] = useState<EventType[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [city, setCity] = useState("all");
@@ -41,6 +42,9 @@ export default function EventsPage() {
       try {
         const data = await getAllEvents();
         setEvents(data.events || []);
+        const categories = JSON.parse(localStorage.getItem("eventsphere-saved-categories") || "[]");
+        const suggestions = await getRecommendations({ categories });
+        setRecommendations(suggestions.recommendations || []);
       } catch (error) {
         console.error(error);
       } finally {
@@ -106,6 +110,8 @@ export default function EventsPage() {
           <select value={price} onChange={(event) => setPrice(event.target.value)} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white"><option value="all">Any price</option><option value="free">Free</option><option value="paid">Paid</option></select>
           <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" />
         </div>
+
+        {recommendations.length ? <section className="mb-10"><div className="flex items-end justify-between"><div><p className="tech-label text-blue-400">For you</p><h2 className="heading-font mt-1 text-3xl font-semibold text-white">Recommended from your interests</h2></div><span className="text-xs text-slate-500">Based on saved categories and attendance</span></div><div className="mt-4 grid gap-4 md:grid-cols-3">{recommendations.slice(0, 3).map((event) => <Link key={event._id} href={`/attendee/${event._id}`} className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 transition-colors hover:border-blue-400/50"><p className="text-xs text-blue-300">{event.category || "General"}</p><h3 className="mt-2 font-semibold text-white">{event.title}</h3><p className="mt-1 line-clamp-2 text-sm text-slate-400">{event.description}</p></Link>)}</div></section> : null}
 
         {filteredEvents.length === 0 ? (
           <div className="rounded-2xl border border-slate-800/60 bg-[#131926]/60 p-10 text-center">
