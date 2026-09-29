@@ -48,11 +48,11 @@ router.get("/:id", getSingleEvent);
 router.put("/:id", updateEvent);
 router.delete("/:id", deleteEvent);
 router.post("/:id/register", registerForEvent);
-router.post("/:id/checkout", createCheckout);
-router.post("/:id/checkout/complete", completeCheckout);
-router.post("/:id/checkout/verify", verifyCheckout);
+router.post("/:id/checkout", isAuthenticated, createCheckout);
+router.post("/:id/checkout/complete", isAuthenticated, completeCheckout);
+router.post("/:id/checkout/verify", isAuthenticated, verifyCheckout);
 router.post("/:id/check-in", isAuthenticated, authorizeRoles("organiser", "admin"), checkIn);
 router.get("/:id/dashboard", isAuthenticated, authorizeRoles("organiser", "admin"), getDashboard);
-router.post("/:id/wishlist", toggleWishlist);
+router.post("/:id/wishlist", isAuthenticated, toggleWishlist);
 
 export default router;

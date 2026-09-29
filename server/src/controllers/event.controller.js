@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 import Review from "../models/review.model.js";
 import Reminder from "../models/reminder.model.js";
 
+const canManageEvent = (event, user) => user?.role === "admin" || !event.organiser || String(event.organiser) === String(user?._id);
+
 export const createEvent = async (req, res) => {
   try {
     const {
@@ -271,7 +273,7 @@ export const completeCheckout = async (req, res) => {
     }
     event.totalRevenue += totalAmount;
     await event.save();
-    const booking = await Booking.create({ event: event._id, tickets, totalAmount, paymentStatus: "paid", paymentId, attendeeName: attendee.name, attendeeEmail: attendee.email });
+    const booking = await Booking.create({ user: req.user._id, event: event._id, tickets, totalAmount, paymentStatus: "paid", paymentId, attendeeName: attendee.name, attendeeEmail: attendee.email });
     booking.qrCode = await QRCode.toDataURL(`EVENTSPHERE:${booking._id}`);
     await booking.save();
     return res.status(201).json({ success: true, booking, event });
@@ -304,7 +306,7 @@ export const verifyCheckout = async (req, res) => {
     }
     event.totalRevenue += totalAmount;
     await event.save();
-    const booking = await Booking.create({ event: event._id, tickets, totalAmount, paymentStatus: "paid", paymentId: razorpayPaymentId, attendeeName: attendee.name, attendeeEmail: attendee.email });
+    const booking = await Booking.create({ user: req.user._id, event: event._id, tickets, totalAmount, paymentStatus: "paid", paymentId: razorpayPaymentId, attendeeName: attendee.name, attendeeEmail: attendee.email });
     booking.qrCode = await QRCode.toDataURL(`EVENTSPHERE:${booking._id}`);
     await booking.save();
     return res.status(201).json({ success: true, booking, event });
@@ -332,6 +334,7 @@ export const checkIn = async (req, res) => {
     const bookingId = req.body.bookingId || req.body.code?.replace("EVENTSPHERE:", "");
     const booking = await Booking.findById(bookingId).populate("event");
     if (!booking) return res.status(404).json({ message: "Ticket not found" });
+    if (!canManageEvent(booking.event, req.user)) return res.status(403).json({ message: "You do not manage this event" });
     if (booking.checkedIn) return res.status(400).json({ message: "Ticket already checked in", booking });
     booking.checkedIn = true;
     await booking.save();
@@ -345,6 +348,7 @@ export const getDashboard = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: "Event not found" });
+    if (!canManageEvent(event, req.user)) return res.status(403).json({ message: "You do not manage this event" });
     const bookings = await Booking.find({ event: event._id }).sort({ createdAt: -1 });
     const registered = bookings.reduce((total, booking) => total + booking.tickets.reduce((sum, ticket) => sum + ticket.quantity, 0), 0);
     const checkedIn = bookings.filter((booking) => booking.checkedIn).length;
@@ -355,8 +359,8 @@ export const getDashboard = async (req, res) => {
 };
 
 export const toggleWishlist = async (req, res) => {
-  const { userId, saved } = req.body;
-  const user = await User.findById(userId);
+  const { saved } = req.body;
+  const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ message: "User not found" });
   const exists = user.wishlist.some((id) => id.toString() === req.params.id);
   if (saved ?? !exists) user.wishlist.addToSet(req.params.id);
@@ -410,7 +414,7 @@ export const createFeedback = async (req, res) => {
 };
 
 export const requestRefund = async (req, res) => {
-  const booking = await Booking.findByIdAndUpdate(req.params.bookingId, { refundStatus: "requested" }, { new: true });
+  const booking = await Booking.findOneAndUpdate({ _id: req.params.bookingId, user: req.user._id }, { refundStatus: "requested" }, { new: true });
   if (!booking) return res.status(404).json({ message: "Booking not found" });
   return res.json({ success: true, message: "Refund request sent to organiser", booking });
 };
@@ -431,8 +435,8 @@ export const decideRefund = async (req, res) => {
 };
 
 export const networkingOptIn = async (req, res) => {
-  const { attendeeKey, name = "EventSphere attendee", linkedin = "", optIn = true } = req.body;
-  if (!attendeeKey) return res.status(400).json({ message: "Attendee key is required" });
+  const { name = req.user.name || "EventSphere attendee", linkedin = "", optIn = true } = req.body;
+  const attendeeKey = String(req.user._id);
   const event = await Event.findById(req.params.id);
   if (!event) return res.status(404).json({ message: "Event not found" });
   event.networkingAttendees = event.networkingAttendees.filter((attendee) => attendee.attendeeKey !== attendeeKey);
