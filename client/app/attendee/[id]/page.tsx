@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getSingleEvent, registerForEvent } from "@/lib/eventApi";
+import { completeCheckout, createCheckout, getSingleEvent } from "@/lib/eventApi";
 import { motion } from "framer-motion";
 
 type TicketType = {
@@ -25,6 +25,9 @@ type EventType = {
   startDate: string;
   endDate: string;
   ticketTypes: TicketType[];
+  agenda?: { time: string; title: string; speaker?: string }[];
+  speakers?: { name: string; designation?: string }[];
+  faqs?: { question: string; answer: string }[];
 };
 
 export default function EventDetailsPage() {
@@ -33,8 +36,10 @@ export default function EventDetailsPage() {
 
   const [event, setEvent] = useState<EventType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTicket, setSelectedTicket] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [discountCode, setDiscountCode] = useState("");
+  const [ticket, setTicket] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
   const loadEvent = async () => {
@@ -53,7 +58,7 @@ export default function EventDetailsPage() {
       setEvent(data.event);
 
       if (data.event?.ticketTypes?.length > 0) {
-        setSelectedTicket(data.event.ticketTypes[0].name);
+        setQuantities(Object.fromEntries(data.event.ticketTypes.map((item: TicketType) => [item.name, 0])));
       }
     } catch (error) {
       console.error("Failed to fetch single event:", error);
@@ -65,25 +70,19 @@ export default function EventDetailsPage() {
   loadEvent();
 }, [id]);
 
-  const selectedTicketData = event?.ticketTypes.find(
-    (ticket) => ticket.name === selectedTicket
-  );
-
-  const totalAmount = selectedTicketData
-    ? selectedTicketData.price * quantity
-    : 0;
+  const selectedTickets = event?.ticketTypes.filter((item) => (quantities[item.name] || 0) > 0).map((item) => ({ ticketName: item.name, quantity: quantities[item.name] })) || [];
 
   const handleRegister = async () => {
     try {
-      const data = await registerForEvent(id, {
-        ticketName: selectedTicket,
-        quantity,
-      });
-
-      alert(data.message || "Registered successfully");
-      setEvent(data.event);
+      if (!selectedTickets.length) throw new Error("Choose at least one ticket");
+      setBusy(true);
+      const order = await createCheckout(id, { tickets: selectedTickets, discountCode });
+      const data = await completeCheckout(id, { tickets: order.tickets, totalAmount: order.totalAmount, paymentId: order.order.id, attendee: { name: "Demo attendee", email: "attendee@eventsphere.test" } });
+      setTicket(data.booking);
     } catch (error: any) {
       alert(error.message || "Registration failed");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -175,6 +174,11 @@ export default function EventDetailsPage() {
               </div>
             </div>
 
+            {(event.agenda?.length || event.speakers?.length) ? <div className="mt-8 grid gap-6 md:grid-cols-2">
+              <div><h2 className="heading-font text-2xl font-semibold text-white">Agenda</h2><div className="mt-3 space-y-2">{event.agenda?.map((item) => <div key={`${item.time}-${item.title}`} className="border-l-2 border-blue-500/50 pl-3"><p className="text-xs text-blue-300">{item.time}</p><p className="text-sm text-white">{item.title}</p><p className="text-xs text-slate-500">{item.speaker}</p></div>)}</div></div>
+              <div><h2 className="heading-font text-2xl font-semibold text-white">Speakers</h2><div className="mt-3 space-y-3">{event.speakers?.map((speaker) => <div key={speaker.name}><p className="text-sm font-medium text-white">{speaker.name}</p><p className="text-xs text-slate-500">{speaker.designation}</p></div>)}</div></div>
+            </div> : null}
+
             <div className="mt-8 rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4">
               <p className="text-xs uppercase tracking-wider text-slate-500">
                 Schedule
@@ -204,71 +208,23 @@ export default function EventDetailsPage() {
             </p>
 
             <div className="mt-6 space-y-4">
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Ticket Type
-                </label>
-
-                <select
-                  value={selectedTicket}
-                  onChange={(e) => setSelectedTicket(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700/70 bg-[#182032] px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none"
-                >
-                  {event.ticketTypes.map((ticket) => (
-                    <option key={ticket.name} value={ticket.name}>
-                      {ticket.name} — ₹{ticket.price}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-3">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Tickets</label>
+                {event.ticketTypes.map((item) => <div key={item.name} className="flex items-center justify-between rounded-xl border border-slate-700/70 bg-[#182032] px-3 py-3"><div><p className="text-sm font-medium text-white">{item.name}</p><p className="text-xs text-slate-500">₹{item.price} · {item.capacity - item.sold} left</p></div><input aria-label={`${item.name} quantity`} type="number" min="0" max={item.capacity - item.sold} value={quantities[item.name] || 0} onChange={(e) => setQuantities({ ...quantities, [item.name]: Math.max(0, Number(e.target.value)) })} className="w-16 rounded-lg border border-slate-700 bg-[#101722] px-2 py-2 text-center text-sm text-white" /></div>)}
               </div>
 
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Quantity
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-700/70 bg-[#182032] px-4 py-3 text-sm text-white focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {selectedTicketData && (
-                <div className="rounded-xl border border-slate-800/60 bg-black/20 p-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Available</span>
-                    <span className="text-white">
-                      {selectedTicketData.capacity - selectedTicketData.sold}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex justify-between text-sm">
-                    <span className="text-slate-400">Price</span>
-                    <span className="text-white">
-                      ₹{selectedTicketData.price}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex justify-between text-base font-semibold">
-                    <span className="text-slate-300">Total</span>
-                    <span className="text-blue-400">₹{totalAmount}</span>
-                  </div>
-                </div>
-              )}
+              <input value={discountCode} onChange={(e) => setDiscountCode(e.target.value)} placeholder="Discount code (optional)" className="w-full rounded-xl border border-slate-700/70 bg-[#182032] px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none" />
 
               <button
                 onClick={handleRegister}
+                disabled={busy}
                 className="heading-font w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 text-base font-medium tracking-wide text-white shadow-lg shadow-blue-600/20 transition-all hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99]"
               >
-                Register for Event
+                {busy ? "Processing..." : "Pay securely / Register"}
               </button>
 
-              <p className="text-center text-xs text-slate-500">
-                Payment and QR ticket generation can be connected later.
-              </p>
+              <p className="text-center text-xs text-slate-500">Sandbox checkout is active. Razorpay is used automatically when server keys are configured.</p>
+              {ticket ? <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center"><p className="font-semibold text-emerald-300">Ticket confirmed</p><img src={ticket.qrCode} alt="Ticket QR code" className="mx-auto mt-3 h-40 w-40 bg-white p-2" /><a href={ticket.qrCode} download="eventsphere-ticket.png" className="mt-3 inline-block text-xs text-emerald-200 underline">Download QR ticket</a></div> : null}
             </div>
           </div>
         </div>
