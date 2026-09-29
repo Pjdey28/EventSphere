@@ -77,6 +77,25 @@ const eventSchema = new mongoose.Schema(
 
     faqs: [faqSchema],
 
+    discountCodes: [{
+      code: String,
+      percent: { type: Number, default: 0 },
+      amount: { type: Number, default: 0 },
+      expiresAt: Date,
+      usageLimit: Number,
+      used: { type: Number, default: 0 }
+    }],
+
+    sessions: [{
+      title: String,
+      startTime: String,
+      endTime: String,
+      speaker: String,
+      room: String
+    }],
+
+    reminderEnabled: { type: Boolean, default: true },
+
     attendees: [
       {
         type: mongoose.Schema.Types.ObjectId,

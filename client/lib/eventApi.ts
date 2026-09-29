@@ -74,3 +74,40 @@ export const registerForEvent = async (
 
   return data;
 };
+
+const request = async (path: string, options?: RequestInit) => {
+  const response = await fetch(`http://localhost:5000/api/events${path}`, options);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
+};
+
+export const createCheckout = (id: string, body: unknown) =>
+  request(`/${id}/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export const completeCheckout = (id: string, body: unknown) =>
+  request(`/${id}/checkout/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export const getDashboard = (id: string) => request(`/${id}/dashboard`);
+
+export const checkInTicket = (id: string, code: string) =>
+  request(`/${id}/check-in`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+
+export const toggleWishlist = (id: string, userId: string, saved: boolean) =>
+  request(`/${id}/wishlist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, saved }),
+  });

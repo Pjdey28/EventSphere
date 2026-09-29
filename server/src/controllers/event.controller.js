@@ -1,4 +1,9 @@
 import Event from "../models/event.model.js";
+import Booking from "../models/booking.model.js";
+import User from "../models/user.model.js";
+import QRCode from "qrcode";
+import Razorpay from "razorpay";
+import crypto from "node:crypto";
 
 export const createEvent = async (req, res) => {
   try {
@@ -16,6 +21,8 @@ export const createEvent = async (req, res) => {
       agenda,
       speakers,
       faqs,
+      discountCodes,
+      sessions,
     } = req.body;
 
     if (!title || !description || !startDate || !endDate) {
@@ -40,6 +47,8 @@ export const createEvent = async (req, res) => {
       agenda,
       speakers,
       faqs,
+      discountCodes,
+      sessions,
     });
 
     return res.status(201).json({
@@ -210,4 +219,95 @@ export const registerForEvent = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+const getDiscount = (event, code, subtotal) => {
+  if (!code) return 0;
+  const discount = event.discountCodes?.find((item) => item.code.toLowerCase() === code.toLowerCase());
+  if (!discount || (discount.expiresAt && new Date(discount.expiresAt) < new Date()) || (discount.usageLimit && discount.used >= discount.usageLimit)) return 0;
+  return Math.min(subtotal, discount.amount || subtotal * ((discount.percent || 0) / 100));
+};
+
+export const createCheckout = async (req, res) => {
+  try {
+    const { tickets = [], discountCode } = req.body;
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    let subtotal = 0;
+    const normalized = tickets.map(({ ticketName, quantity }) => {
+      const ticket = event.ticketTypes.find((item) => item.name.toLowerCase() === ticketName.toLowerCase());
+      if (!ticket || quantity < 1 || ticket.capacity - ticket.sold < quantity) throw new Error(`Ticket unavailable: ${ticketName}`);
+      subtotal += ticket.price * quantity;
+      return { ticketType: ticket.name, quantity, price: ticket.price };
+    });
+    const discount = getDiscount(event, discountCode, subtotal);
+    const totalAmount = Math.max(0, subtotal - discount);
+    let order = { id: `demo_${crypto.randomUUID()}`, amount: totalAmount * 100, currency: "INR" };
+    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && totalAmount > 0) {
+      const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
+      order = await razorpay.orders.create({ amount: Math.round(totalAmount * 100), currency: "INR", receipt: `event_${event._id}` });
+    }
+    return res.json({ success: true, order, keyId: process.env.RAZORPAY_KEY_ID || "demo", subtotal, discount, totalAmount, tickets: normalized });
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Checkout failed" });
+  }
+};
+
+export const completeCheckout = async (req, res) => {
+  try {
+    const { tickets = [], totalAmount, paymentId = "demo_payment", attendee = {} } = req.body;
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    for (const item of tickets) {
+      const ticket = event.ticketTypes.find((entry) => entry.name === item.ticketType);
+      if (!ticket || ticket.capacity - ticket.sold < item.quantity) return res.status(400).json({ message: "Ticket capacity changed. Please retry." });
+      ticket.sold += item.quantity;
+    }
+    event.totalRevenue += totalAmount;
+    await event.save();
+    const booking = await Booking.create({ event: event._id, tickets, totalAmount, paymentStatus: "paid", paymentId, attendeeName: attendee.name, attendeeEmail: attendee.email });
+    booking.qrCode = await QRCode.toDataURL(`EVENTSPHERE:${booking._id}`);
+    await booking.save();
+    return res.status(201).json({ success: true, booking, event });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || "Payment completion failed" });
+  }
+};
+
+export const checkIn = async (req, res) => {
+  try {
+    const bookingId = req.body.bookingId || req.body.code?.replace("EVENTSPHERE:", "");
+    const booking = await Booking.findById(bookingId).populate("event");
+    if (!booking) return res.status(404).json({ message: "Ticket not found" });
+    if (booking.checkedIn) return res.status(400).json({ message: "Ticket already checked in", booking });
+    booking.checkedIn = true;
+    await booking.save();
+    return res.json({ success: true, message: "Attendee checked in", booking });
+  } catch (error) {
+    return res.status(400).json({ message: "Invalid ticket code" });
+  }
+};
+
+export const getDashboard = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    const bookings = await Booking.find({ event: event._id }).sort({ createdAt: -1 });
+    const registered = bookings.reduce((total, booking) => total + booking.tickets.reduce((sum, ticket) => sum + ticket.quantity, 0), 0);
+    const checkedIn = bookings.filter((booking) => booking.checkedIn).length;
+    return res.json({ success: true, event, bookings, stats: { registered, checkedIn, revenue: event.totalRevenue } });
+  } catch (error) {
+    return res.status(500).json({ message: "Dashboard unavailable" });
+  }
+};
+
+export const toggleWishlist = async (req, res) => {
+  const { userId, saved } = req.body;
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  const exists = user.wishlist.some((id) => id.toString() === req.params.id);
+  if (saved ?? !exists) user.wishlist.addToSet(req.params.id);
+  else user.wishlist.pull(req.params.id);
+  await user.save();
+  return res.json({ success: true, saved: user.wishlist.some((id) => id.toString() === req.params.id) });
 };
