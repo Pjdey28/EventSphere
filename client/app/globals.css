@@ -130,11 +130,11 @@
 }
 
 body {
-  font-family: var(--font-inter), sans-serif;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
 .heading-font {
-  font-family: var(--font-space), sans-serif;
+  font-family: "Candara", "Trebuchet MS", sans-serif;
 }
 
 .tech-label {

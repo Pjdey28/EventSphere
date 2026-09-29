@@ -29,6 +29,11 @@ type EventType = {
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventType[]>([]);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [city, setCity] = useState("all");
+  const [price, setPrice] = useState("all");
+  const [date, setDate] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,6 +59,15 @@ export default function EventsPage() {
 
     return minPrice === 0 ? "Free" : `₹${minPrice}`;
   };
+
+  const filteredEvents = events.filter((event) => {
+    const lowest = Math.min(...(event.ticketTypes || []).map((ticket) => ticket.price), 0);
+    return event.title.toLowerCase().includes(query.toLowerCase()) &&
+      (category === "all" || event.category === category) &&
+      (city === "all" || event.city === city) &&
+      (price === "all" || (price === "free" ? lowest === 0 : lowest > 0)) &&
+      (!date || event.startDate?.slice(0, 10) === date);
+  });
 
   if (loading) {
     return (
@@ -84,7 +98,15 @@ export default function EventsPage() {
           </p>
         </motion.div>
 
-        {events.length === 0 ? (
+        <div className="mb-8 grid gap-3 rounded-2xl border border-slate-800 bg-[#131926]/70 p-4 sm:grid-cols-2 lg:grid-cols-5">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search events" className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white placeholder-slate-500" />
+          <select value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white"><option value="all">All categories</option>{[...new Set(events.map((event) => event.category).filter(Boolean))].map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={city} onChange={(event) => setCity(event.target.value)} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white"><option value="all">All cities</option>{[...new Set(events.map((event) => event.city).filter(Boolean))].map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={price} onChange={(event) => setPrice(event.target.value)} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white"><option value="all">Any price</option><option value="free">Free</option><option value="paid">Paid</option></select>
+          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" />
+        </div>
+
+        {filteredEvents.length === 0 ? (
           <div className="rounded-2xl border border-slate-800/60 bg-[#131926]/60 p-10 text-center">
             <h2 className="text-xl font-semibold text-white">No events found</h2>
             <p className="mt-2 text-sm text-slate-400">
@@ -93,7 +115,7 @@ export default function EventsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {events.map((event, index) => (
+            {filteredEvents.map((event, index) => (
               <motion.div
                 key={event._id}
                 initial={{ opacity: 0, y: 18 }}
