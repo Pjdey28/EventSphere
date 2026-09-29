@@ -238,8 +238,10 @@ export const createCheckout = async (req, res) => {
     const normalized = tickets.map(({ ticketName, quantity }) => {
       const ticket = event.ticketTypes.find((item) => item.name.toLowerCase() === ticketName.toLowerCase());
       if (!ticket || quantity < 1 || ticket.capacity - ticket.sold < quantity) throw new Error(`Ticket unavailable: ${ticketName}`);
-      subtotal += ticket.price * quantity;
-      return { ticketType: ticket.name, quantity, price: ticket.price };
+      const activeEarlyBird = ticket.earlyBirdPrice > 0 && ticket.earlyBirdDeadline && new Date(ticket.earlyBirdDeadline) >= new Date();
+      const price = activeEarlyBird ? ticket.earlyBirdPrice : ticket.price;
+      subtotal += price * quantity;
+      return { ticketType: ticket.name, quantity, price };
     });
     const discount = getDiscount(event, discountCode, subtotal);
     const totalAmount = Math.max(0, subtotal - discount);

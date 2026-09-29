@@ -8,6 +8,11 @@ const ticketSchema = new mongoose.Schema({
     default: 0
   },
 
+  earlyBirdPrice: {
+    type: Number,
+    default: 0
+  },
+
   capacity: Number,
 
   sold: {

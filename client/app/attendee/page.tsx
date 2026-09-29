@@ -96,6 +96,7 @@ export default function EventsPage() {
             Browse upcoming events, view details, and register for your preferred
             ticket tier.
           </p>
+          <Link href="/attendee/dashboard" className="mt-4 inline-block text-sm font-semibold text-blue-300">Open my attendee dashboard →</Link>
         </motion.div>
 
         <div className="mb-8 grid gap-3 rounded-2xl border border-slate-800 bg-[#131926]/70 p-4 sm:grid-cols-2 lg:grid-cols-5">

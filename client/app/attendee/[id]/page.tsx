@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { completeCheckout, createCheckout, getSingleEvent } from "@/lib/eventApi";
+import { completeCheckout, createCheckout, getSingleEvent, saveNetworkingPreference, submitReview, toggleWishlist } from "@/lib/eventApi";
 import { motion } from "framer-motion";
 
 type TicketType = {
@@ -40,6 +40,9 @@ export default function EventDetailsPage() {
   const [discountCode, setDiscountCode] = useState("");
   const [ticket, setTicket] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [review, setReview] = useState({ rating: 5, comment: "" });
+  const [networking, setNetworking] = useState(false);
 
   useEffect(() => {
   const loadEvent = async () => {
@@ -56,6 +59,7 @@ export default function EventDetailsPage() {
       console.log("Fetched event:", data);
 
       setEvent(data.event);
+      setIsWishlisted(JSON.parse(localStorage.getItem("eventsphere-wishlist") || "[]").includes(id));
 
       if (data.event?.ticketTypes?.length > 0) {
         setQuantities(Object.fromEntries(data.event.ticketTypes.map((item: TicketType) => [item.name, 0])));
@@ -79,11 +83,27 @@ export default function EventDetailsPage() {
       const order = await createCheckout(id, { tickets: selectedTickets, discountCode });
       const data = await completeCheckout(id, { tickets: order.tickets, totalAmount: order.totalAmount, paymentId: order.order.id, attendee: { name: "Demo attendee", email: "attendee@eventsphere.test" } });
       setTicket(data.booking);
+      localStorage.setItem("eventsphere-last-ticket", JSON.stringify(data.booking));
     } catch (error: any) {
       alert(error.message || "Registration failed");
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleWishlist = async () => {
+    const next = !isWishlisted;
+    const ids = JSON.parse(localStorage.getItem("eventsphere-wishlist") || "[]").filter((item: string) => item !== id);
+    if (next) ids.push(id);
+    localStorage.setItem("eventsphere-wishlist", JSON.stringify(ids));
+    setIsWishlisted(next);
+    try { await toggleWishlist(id, "", next); } catch { /* local demo wishlist remains available without auth */ }
+  };
+
+  const handleReview = async () => {
+    if (!review.comment.trim()) return;
+    await submitReview(id, review);
+    setReview({ rating: 5, comment: "" });
   };
 
   if (loading) {
@@ -128,9 +148,7 @@ export default function EventDetailsPage() {
           <div className="lg:col-span-2">
             <span className="tech-label text-blue-400">Event Details</span>
 
-            <h1 className="heading-font mt-2 bg-gradient-to-r from-white via-blue-100 to-blue-500 bg-clip-text text-5xl font-bold tracking-tight text-transparent">
-              {event.title}
-            </h1>
+            <div className="flex items-start justify-between gap-4"><h1 className="heading-font mt-2 bg-gradient-to-r from-white via-blue-100 to-blue-500 bg-clip-text text-5xl font-bold tracking-tight text-transparent">{event.title}</h1><button type="button" onClick={handleWishlist} className="mt-3 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300">{isWishlisted ? "Saved" : "Save event"}</button></div>
 
             <p className="mt-5 text-sm leading-7 text-slate-400">
               {event.description}
@@ -196,6 +214,13 @@ export default function EventDetailsPage() {
                   : "Not specified"}
               </p>
             </div>
+
+            <div className="mt-8 grid gap-6 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-2xl font-semibold text-white">Venue map</h2><div className="mt-3 flex h-36 items-center justify-center rounded-lg bg-[radial-gradient(circle_at_30%_40%,#3b82f633,transparent_22%),linear-gradient(135deg,#182032,#101722)] text-sm text-slate-400">{event.mode === "online" ? "Online venue · link shared after booking" : `Map preview · ${event.venue || event.city}`}</div></div>
+              <div className="rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-2xl font-semibold text-white">FAQs</h2><div className="mt-3 space-y-3">{event.faqs?.length ? event.faqs.map((faq) => <details key={faq.question} className="border-b border-slate-800 pb-2"><summary className="cursor-pointer text-sm text-white">{faq.question}</summary><p className="mt-2 text-sm text-slate-400">{faq.answer}</p></details>) : <p className="text-sm text-slate-500">The organiser has not added FAQs yet.</p>}</div></div>
+            </div>
+
+            <div className="mt-8 rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-2xl font-semibold text-white">Community</h2><div className="mt-3 flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={networking} onChange={(e) => { setNetworking(e.target.checked); localStorage.setItem("eventsphere-networking", String(e.target.checked)); void saveNetworkingPreference({ userId: "", optIn: e.target.checked, linkedin: "" }).catch(() => undefined); }} /> Share my LinkedIn with attendees</label><span className="text-xs text-slate-500">You can change this anytime.</span></div><div className="mt-4 flex gap-2"><select value={review.rating} onChange={(e) => setReview({ ...review, rating: Number(e.target.value) })} className="rounded-lg border border-slate-700 bg-[#182032] px-2 py-2 text-sm text-white"><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select><input value={review.comment} onChange={(e) => setReview({ ...review, comment: e.target.value })} placeholder="Leave a review" className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white placeholder-slate-500" /><button type="button" onClick={handleReview} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Review</button></div></div>
           </div>
 
           <div className="rounded-2xl border border-blue-500/20 bg-[#161e2e]/80 p-5 shadow-lg shadow-blue-500/5">

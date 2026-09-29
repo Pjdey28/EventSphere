@@ -21,6 +21,7 @@ export default function CreateEventPage() {
     {
       name: "",
       price: 0,
+      earlyBirdPrice: 0,
       capacity: 0,
       sold: 0,
       earlyBirdDeadline: "",
@@ -54,7 +55,7 @@ export default function CreateEventPage() {
     updated[index] = {
       ...updated[index],
       [field]:
-        field === "price" || field === "capacity" || field === "sold"
+        field === "price" || field === "earlyBirdPrice" || field === "capacity" || field === "sold"
           ? Number(value)
           : value,
     };
@@ -68,6 +69,7 @@ export default function CreateEventPage() {
       {
         name: "",
         price: 0,
+        earlyBirdPrice: 0,
         capacity: 0,
         sold: 0,
         earlyBirdDeadline: "",
@@ -390,6 +392,16 @@ const itemVariants: Variants = {
                         handleTicketChange(index, "capacity", e.target.value)
                       }
                       required
+                    />
+
+                    <input
+                      type="number"
+                      placeholder="Early bird price"
+                      value={ticket.earlyBirdPrice || ""}
+                      className="rounded-lg border border-slate-700/50 bg-[#1c263b] px-3 py-2.5 text-[15px] text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                      onChange={(e) =>
+                        handleTicketChange(index, "earlyBirdPrice", e.target.value)
+                      }
                     />
 
                     <div className="flex items-center gap-2">
