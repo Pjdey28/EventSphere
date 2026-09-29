@@ -111,3 +111,27 @@ export const toggleWishlist = (id: string, userId: string, saved: boolean) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, saved }),
   });
+
+export const generateEventDescription = (bullets: string[]) =>
+  request("/ai/description", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bullets }),
+  });
+
+export const submitReview = (id: string, body: unknown) =>
+  request(`/${id}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export const requestRefund = (bookingId: string) =>
+  request(`/bookings/${bookingId}/refund`, { method: "POST" });
+
+export const saveNetworkingPreference = (body: unknown) =>
+  request("/networking", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });

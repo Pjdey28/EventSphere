@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createEvent } from "@/lib/eventApi";
+import { createEvent, generateEventDescription } from "@/lib/eventApi";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 export default function CreateEventPage() {
@@ -26,6 +26,12 @@ export default function CreateEventPage() {
       earlyBirdDeadline: "",
     },
   ]);
+  const [discountCodes, setDiscountCodes] = useState([{ code: "", percent: 0, amount: 0, expiresAt: "", usageLimit: 0 }]);
+  const [agenda, setAgenda] = useState([{ time: "", title: "", speaker: "" }]);
+  const [speakers, setSpeakers] = useState([{ name: "", designation: "", image: "" }]);
+  const [faqs, setFaqs] = useState([{ question: "", answer: "" }]);
+  const [aiBullets, setAiBullets] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -82,6 +88,10 @@ export default function CreateEventPage() {
       const finalData = {
         ...formData,
         ticketTypes,
+        discountCodes: discountCodes.filter((item) => item.code),
+        agenda: agenda.filter((item) => item.title),
+        speakers: speakers.filter((item) => item.name),
+        faqs: faqs.filter((item) => item.question),
       };
 
       const data = await createEvent(finalData);
@@ -89,6 +99,20 @@ export default function CreateEventPage() {
     } catch (error) {
       console.error(error);
       alert("Failed to create event");
+    }
+  };
+
+  const draftDescription = async () => {
+    const bullets = aiBullets.split("\n").map((item) => item.trim()).filter(Boolean);
+    if (!bullets.length) return;
+    setAiBusy(true);
+    try {
+      const data = await generateEventDescription(bullets);
+      setFormData((current) => ({ ...current, description: data.description }));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -165,6 +189,23 @@ const itemVariants: Variants = {
               onChange={handleChange}
               required
             />
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-300">AI description draft</p>
+              <textarea value={aiBullets} onChange={(e) => setAiBullets(e.target.value)} placeholder="One bullet per line: hands-on React workshop\nMeet senior engineers" rows={2} className="mt-3 w-full rounded-lg border border-slate-700 bg-[#101722] px-3 py-2 text-sm text-white placeholder-slate-600" />
+              <button type="button" onClick={draftDescription} disabled={aiBusy} className="mt-2 rounded-lg border border-blue-400/30 px-3 py-2 text-xs font-semibold text-blue-300">{aiBusy ? "Drafting..." : "Draft description"}</button>
+            </div>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="space-y-3 rounded-xl border border-slate-800/60 bg-[#161e2e]/50 p-4">
+            <h2 className="heading-font text-2xl font-semibold text-white">Discount codes</h2>
+            {discountCodes.map((discount, index) => <div key={index} className="grid gap-2 sm:grid-cols-4"><input placeholder="Code" value={discount.code} onChange={(e) => setDiscountCodes(discountCodes.map((item, i) => i === index ? { ...item, code: e.target.value.toUpperCase() } : item))} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input type="number" placeholder="Percent" value={discount.percent || ""} onChange={(e) => setDiscountCodes(discountCodes.map((item, i) => i === index ? { ...item, percent: Number(e.target.value) } : item))} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input type="date" value={discount.expiresAt} onChange={(e) => setDiscountCodes(discountCodes.map((item, i) => i === index ? { ...item, expiresAt: e.target.value } : item))} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input type="number" placeholder="Uses" value={discount.usageLimit || ""} onChange={(e) => setDiscountCodes(discountCodes.map((item, i) => i === index ? { ...item, usageLimit: Number(e.target.value) } : item))} className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}
+            <button type="button" onClick={() => setDiscountCodes([...discountCodes, { code: "", percent: 0, amount: 0, expiresAt: "", usageLimit: 0 }])} className="text-xs font-semibold text-blue-300">+ Add discount code</button>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2"><h2 className="heading-font text-xl font-semibold text-white">Agenda</h2>{agenda.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Session title" value={item.title} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, title: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input placeholder="Time" value={item.time} onChange={(e) => setAgenda(agenda.map((row, i) => i === index ? { ...row, time: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}<button type="button" onClick={() => setAgenda([...agenda, { time: "", title: "", speaker: "" }])} className="text-xs text-blue-300">+ Add session</button></div>
+            <div className="space-y-2"><h2 className="heading-font text-xl font-semibold text-white">Speakers</h2>{speakers.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Name" value={item.name} onChange={(e) => setSpeakers(speakers.map((row, i) => i === index ? { ...row, name: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><input placeholder="Role / designation" value={item.designation} onChange={(e) => setSpeakers(speakers.map((row, i) => i === index ? { ...row, designation: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}<button type="button" onClick={() => setSpeakers([...speakers, { name: "", designation: "", image: "" }])} className="text-xs text-blue-300">+ Add speaker</button></div>
+            <div className="space-y-2"><h2 className="heading-font text-xl font-semibold text-white">FAQs</h2>{faqs.map((item, index) => <div key={index} className="space-y-2"><input placeholder="Question" value={item.question} onChange={(e) => setFaqs(faqs.map((row, i) => i === index ? { ...row, question: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /><textarea placeholder="Answer" value={item.answer} onChange={(e) => setFaqs(faqs.map((row, i) => i === index ? { ...row, answer: e.target.value } : row))} className="w-full rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white" /></div>)}<button type="button" onClick={() => setFaqs([...faqs, { question: "", answer: "" }])} className="text-xs text-blue-300">+ Add FAQ</button></div>
           </motion.div>
 
           <motion.div
