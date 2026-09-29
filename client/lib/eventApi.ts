@@ -129,6 +129,13 @@ export const submitReview = (id: string, body: unknown) =>
 export const requestRefund = (bookingId: string) =>
   request(`/bookings/${bookingId}/refund`, { method: "POST" });
 
+export const decideRefund = (bookingId: string, status: "approved" | "rejected") =>
+  request(`/bookings/${bookingId}/refund`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
 export const saveNetworkingPreference = (body: unknown) =>
   request("/networking", {
     method: "POST",
