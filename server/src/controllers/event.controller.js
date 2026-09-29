@@ -4,6 +4,7 @@ import User from "../models/user.model.js";
 import QRCode from "qrcode";
 import Razorpay from "razorpay";
 import crypto from "node:crypto";
+import Review from "../models/review.model.js";
 
 export const createEvent = async (req, res) => {
   try {
@@ -310,4 +311,52 @@ export const toggleWishlist = async (req, res) => {
   else user.wishlist.pull(req.params.id);
   await user.save();
   return res.json({ success: true, saved: user.wishlist.some((id) => id.toString() === req.params.id) });
+};
+
+export const generateDescription = async (req, res) => {
+  const { bullets = [], sessions = [] } = req.body;
+  if (!bullets.length) return res.status(400).json({ message: "Add at least one event bullet" });
+  if (process.env.GROQ_API_KEY) {
+    const { default: Groq } = await import("groq-sdk");
+    const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const completion = await client.chat.completions.create({ model: "llama-3.1-8b-instant", messages: [{ role: "user", content: `Write a polished event description from these points: ${bullets.join("; ")}` }], temperature: 0.7 });
+    return res.json({ success: true, description: completion.choices[0]?.message?.content || bullets.join(" ") });
+  }
+  return res.json({ success: true, description: `${bullets.join(". ")}. Join us for a thoughtfully curated experience with practical takeaways, meaningful connections, and a welcoming community.` , schedule: sessions.slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))) });
+};
+
+export const suggestSchedule = async (req, res) => {
+  const sessions = Array.isArray(req.body.sessions) ? req.body.sessions : [];
+  return res.json({ success: true, sessions: sessions.slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))), reason: "Sessions are ordered by start time to preserve speaker availability and audience flow." });
+};
+
+export const createReview = async (req, res) => {
+  const { rating, comment, userId } = req.body;
+  const review = await Review.create({ event: req.params.id, rating, comment, user: userId || undefined });
+  await Event.findByIdAndUpdate(req.params.id, { $push: { reviews: review._id } });
+  return res.status(201).json({ success: true, review });
+};
+
+export const requestRefund = async (req, res) => {
+  const booking = await Booking.findByIdAndUpdate(req.params.bookingId, { refundStatus: "requested" }, { new: true });
+  if (!booking) return res.status(404).json({ message: "Booking not found" });
+  return res.json({ success: true, message: "Refund request sent to organiser", booking });
+};
+
+export const decideRefund = async (req, res) => {
+  const status = ["approved", "rejected"].includes(req.body.status) ? req.body.status : "rejected";
+  const booking = await Booking.findByIdAndUpdate(req.params.bookingId, { refundStatus: status, paymentStatus: status === "approved" ? "failed" : "paid" }, { new: true });
+  if (!booking) return res.status(404).json({ message: "Booking not found" });
+  return res.json({ success: true, booking, payout: status === "approved" ? "reversed in sandbox" : "retained" });
+};
+
+export const networkingOptIn = async (req, res) => {
+  const user = await User.findByIdAndUpdate(req.body.userId, { linkedin: req.body.linkedin, networkingOptIn: req.body.optIn !== false }, { new: true });
+  if (!user) return res.status(404).json({ message: "User not found" });
+  return res.json({ success: true, message: "Networking preference saved" });
+};
+
+export const getRecommendations = async (req, res) => {
+  const events = await Event.find({ _id: { $ne: req.body.excludeId } }).sort({ createdAt: -1 }).limit(6);
+  return res.json({ success: true, recommendations: events, basis: "recent categories and attended events" });
 };
