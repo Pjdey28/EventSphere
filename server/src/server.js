@@ -12,7 +12,7 @@ const server = http.createServer(app);
 
 export const io = new Server(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: process.env.CLIENT_URL || "http://localhost:3000",
         credentials: true
     }
 });
@@ -21,8 +21,9 @@ mongoose.connect(process.env.MONGO_URI)
 .then(() => {
     console.log("MongoDB Connected");
 
-    server.listen(5000, () => {
-        console.log("Server running on port 5000");
+    const port = process.env.PORT || 5000;
+    server.listen(port, () => {
+        console.log(`Server running on port ${port}`);
         runNotificationSweep().catch((error) => console.error("Notification sweep failed", error));
         setInterval(() => runNotificationSweep().catch((error) => console.error("Notification sweep failed", error)), 60 * 1000);
     });
