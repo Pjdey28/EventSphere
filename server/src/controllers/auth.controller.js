@@ -3,6 +3,12 @@ import jwt from "jsonwebtoken";
 
 import User from "../models/user.model.js";
 
+const publicUser = (user) => {
+  const value = user.toObject();
+  delete value.password;
+  return value;
+};
+
 export const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -37,7 +43,7 @@ export const register = async (req, res) => {
     res.status(201).json({
       success: true,
       token,
-      user
+      user: publicUser(user)
     });
   } catch (error) {
     res.status(500).json({
@@ -79,7 +85,7 @@ export const login = async (req, res) => {
     res.status(200).json({
       success: true,
       token,
-      user
+      user: publicUser(user)
     });
   } catch (error) {
     res.status(500).json({

@@ -1,11 +1,18 @@
 const API_URL = "http://localhost:5000/api/events";
 
+const authHeaders = () => {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("eventsphere-token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const createEvent = async (eventData: any) => {
   const response = await fetch(API_URL, {
     method: "POST",
 
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
     },
 
     body: JSON.stringify(eventData),
@@ -76,7 +83,7 @@ export const registerForEvent = async (
 };
 
 const request = async (path: string, options?: RequestInit) => {
-  const response = await fetch(`http://localhost:5000/api/events${path}`, options);
+  const response = await fetch(`http://localhost:5000/api/events${path}`, { ...options, headers: { ...authHeaders(), ...(options?.headers || {}) } });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || "Request failed");
   return data;
@@ -174,3 +181,9 @@ export const verifyCheckout = (id: string, body: unknown) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+export const registerUser = (body: unknown) => fetch("http://localhost:5000/api/auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.message || "Registration failed"); return data; });
+
+export const loginUser = (body: unknown) => fetch("http://localhost:5000/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.message || "Login failed"); return data; });
+
+export const uploadBanner = (file: File) => { const form = new FormData(); form.append("banner", file); return fetch("http://localhost:5000/api/uploads/banner", { method: "POST", headers: authHeaders(), body: form }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.message || "Upload failed"); return data; }); };

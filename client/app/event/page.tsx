@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createEvent, generateEventDescription, suggestEventSchedule } from "@/lib/eventApi";
+import { createEvent, generateEventDescription, suggestEventSchedule, uploadBanner } from "@/lib/eventApi";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 
 export default function CreateEventPage() {
@@ -34,6 +34,7 @@ export default function CreateEventPage() {
   const [aiBullets, setAiBullets] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -128,6 +129,19 @@ export default function CreateEventPage() {
       console.error(error);
     } finally {
       setScheduleBusy(false);
+    }
+  };
+
+  const handleBannerUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setUploadBusy(true);
+    try {
+      const data = await uploadBanner(file);
+      setFormData((current) => ({ ...current, banner: data.url }));
+    } catch (error: any) {
+      alert(error.message || "Banner upload failed");
+    } finally {
+      setUploadBusy(false);
     }
   };
 
@@ -294,6 +308,9 @@ const itemVariants: Variants = {
           </motion.div>
 
           <motion.div variants={itemVariants}>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400">Banner image</label>
+            <input type="file" accept="image/*" onChange={(e) => handleBannerUpload(e.target.files?.[0])} className="w-full rounded-xl border border-slate-700/70 bg-[#182032] px-4 py-3 text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white" />
+            {uploadBusy ? <p className="mt-2 text-xs text-blue-300">Uploading banner...</p> : null}
             <input
               name="banner"
               value={formData.banner}
