@@ -32,7 +32,7 @@ const bookingSchema = new mongoose.Schema(
 
     qrCode: String,
 
-    paymentId: String,
+    paymentId: { type: String, unique: true, sparse: true },
     attendeeName: String,
     attendeeEmail: String,
 

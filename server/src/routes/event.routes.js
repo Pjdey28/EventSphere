@@ -9,6 +9,7 @@ import {
   registerForEvent,
   createCheckout,
   completeCheckout,
+  verifyCheckout,
   checkIn,
   getDashboard,
   toggleWishlist,
@@ -38,6 +39,7 @@ router.delete("/:id", deleteEvent);
 router.post("/:id/register", registerForEvent);
 router.post("/:id/checkout", createCheckout);
 router.post("/:id/checkout/complete", completeCheckout);
+router.post("/:id/checkout/verify", verifyCheckout);
 router.post("/:id/check-in", checkIn);
 router.get("/:id/dashboard", getDashboard);
 router.post("/:id/wishlist", toggleWishlist);

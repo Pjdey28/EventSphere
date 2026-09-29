@@ -248,7 +248,7 @@ export const createCheckout = async (req, res) => {
     let order = { id: `demo_${crypto.randomUUID()}`, amount: totalAmount * 100, currency: "INR" };
     if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && totalAmount > 0) {
       const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
-      order = await razorpay.orders.create({ amount: Math.round(totalAmount * 100), currency: "INR", receipt: `event_${event._id}` });
+      order = await razorpay.orders.create({ amount: Math.round(totalAmount * 100), currency: "INR", receipt: `event_${event._id}`, notes: { eventId: String(event._id), tickets: JSON.stringify(normalized) } });
     }
     return res.json({ success: true, order, keyId: process.env.RAZORPAY_KEY_ID || "demo", subtotal, discount, totalAmount, tickets: normalized });
   } catch (error) {
@@ -259,6 +259,7 @@ export const createCheckout = async (req, res) => {
 export const completeCheckout = async (req, res) => {
   try {
     const { tickets = [], totalAmount, paymentId = "demo_payment", attendee = {} } = req.body;
+    if (!String(paymentId).startsWith("demo_")) return res.status(400).json({ message: "Use Razorpay payment verification for live payments" });
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: "Event not found" });
     for (const item of tickets) {
@@ -274,6 +275,51 @@ export const completeCheckout = async (req, res) => {
     return res.status(201).json({ success: true, booking, event });
   } catch (error) {
     return res.status(500).json({ message: error.message || "Payment completion failed" });
+  }
+};
+
+export const verifyCheckout = async (req, res) => {
+  try {
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, attendee = {} } = req.body;
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) return res.status(400).json({ message: "Incomplete Razorpay response" });
+    const expected = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET).update(`${razorpayOrderId}|${razorpayPaymentId}`).digest("hex");
+    if (expected !== razorpaySignature) return res.status(400).json({ message: "Invalid payment signature" });
+    const existing = await Booking.findOne({ paymentId: razorpayPaymentId });
+    if (existing) return res.json({ success: true, booking: existing, duplicate: true });
+    const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
+    const order = await razorpay.orders.fetch(razorpayOrderId);
+    const event = await Event.findById(order.notes?.eventId || req.params.id);
+    const tickets = JSON.parse(order.notes?.tickets || "[]");
+    if (!event || !tickets.length) return res.status(400).json({ message: "Payment order metadata is invalid" });
+    const totalAmount = tickets.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    if (Number(order.amount) !== Math.round(totalAmount * 100)) return res.status(400).json({ message: "Payment amount mismatch" });
+    for (const item of tickets) {
+      const ticket = event.ticketTypes.find((entry) => entry.name === item.ticketType);
+      if (!ticket || ticket.capacity - ticket.sold < item.quantity) return res.status(400).json({ message: "Ticket capacity changed. Refund required." });
+      ticket.sold += item.quantity;
+    }
+    event.totalRevenue += totalAmount;
+    await event.save();
+    const booking = await Booking.create({ event: event._id, tickets, totalAmount, paymentStatus: "paid", paymentId: razorpayPaymentId, attendeeName: attendee.name, attendeeEmail: attendee.email });
+    booking.qrCode = await QRCode.toDataURL(`EVENTSPHERE:${booking._id}`);
+    await booking.save();
+    return res.status(201).json({ success: true, booking, event });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || "Payment verification failed" });
+  }
+};
+
+export const razorpayWebhook = async (req, res) => {
+  try {
+    const signature = req.headers["x-razorpay-signature"];
+    const expected = crypto.createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET).update(req.rawBody || JSON.stringify(req.body)).digest("hex");
+    if (!signature || signature !== expected) return res.status(400).json({ message: "Invalid webhook signature" });
+    const payment = req.body.payload?.payment?.entity;
+    if (payment?.id && req.body.event === "payment.failed") await Booking.findOneAndUpdate({ paymentId: payment.id }, { paymentStatus: "failed" });
+    if (payment?.id && req.body.event === "payment.captured") await Booking.findOneAndUpdate({ paymentId: payment.id }, { paymentStatus: "paid" });
+    return res.json({ received: true });
+  } catch (error) {
+    return res.status(400).json({ message: "Webhook processing failed" });
   }
 };
 
