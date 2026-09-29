@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
 const API_URL = `${API_BASE}/api/events`;
 
 const authHeaders = (): Record<string, string> => {
@@ -60,12 +60,13 @@ export const registerForEvent = async (
   }
 ) => {
   const response = await fetch(
-    `http://localhost:5000/api/events/${id}/register`,
+    `${API_BASE}/api/events/${id}/register`,
     {
       method: "POST",
 
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders(),
       },
 
       body: JSON.stringify(registrationData),
