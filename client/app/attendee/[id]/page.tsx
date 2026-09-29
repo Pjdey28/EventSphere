@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { completeCheckout, createCheckout, getSingleEvent, saveNetworkingPreference, submitReview, toggleWishlist, verifyCheckout } from "@/lib/eventApi";
+import { completeCheckout, createCheckout, getNetworkingAttendees, getReviews, getSingleEvent, saveNetworkingPreference, submitFeedback, submitReview, toggleWishlist, verifyCheckout } from "@/lib/eventApi";
 import { motion } from "framer-motion";
 
 type TicketType = {
@@ -28,6 +28,7 @@ type EventType = {
   agenda?: { time: string; title: string; speaker?: string }[];
   speakers?: { name: string; designation?: string }[];
   faqs?: { question: string; answer: string }[];
+  reviews?: { rating: number; comment: string; createdAt: string }[];
 };
 
 export default function EventDetailsPage() {
@@ -43,6 +44,9 @@ export default function EventDetailsPage() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [review, setReview] = useState({ rating: 5, comment: "" });
   const [networking, setNetworking] = useState(false);
+  const [networkers, setNetworkers] = useState<{ name: string; linkedin: string }[]>([]);
+  const [linkedin, setLinkedin] = useState("");
+  const [feedback, setFeedback] = useState({ rating: 5, comment: "" });
 
   useEffect(() => {
   const loadEvent = async () => {
@@ -59,6 +63,9 @@ export default function EventDetailsPage() {
       console.log("Fetched event:", data);
 
       setEvent(data.event);
+      const [reviewData, networkData] = await Promise.all([getReviews(id), getNetworkingAttendees(id)]);
+      setEvent((current) => current ? { ...current, reviews: reviewData.reviews || [] } : current);
+      setNetworkers(networkData.attendees || []);
       setIsWishlisted(JSON.parse(localStorage.getItem("eventsphere-wishlist") || "[]").includes(id));
 
       if (data.event?.ticketTypes?.length > 0) {
@@ -241,7 +248,9 @@ export default function EventDetailsPage() {
               <div className="rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-2xl font-semibold text-white">FAQs</h2><div className="mt-3 space-y-3">{event.faqs?.length ? event.faqs.map((faq) => <details key={faq.question} className="border-b border-slate-800 pb-2"><summary className="cursor-pointer text-sm text-white">{faq.question}</summary><p className="mt-2 text-sm text-slate-400">{faq.answer}</p></details>) : <p className="text-sm text-slate-500">The organiser has not added FAQs yet.</p>}</div></div>
             </div>
 
-            <div className="mt-8 rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-2xl font-semibold text-white">Community</h2><div className="mt-3 flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={networking} onChange={(e) => { setNetworking(e.target.checked); localStorage.setItem("eventsphere-networking", String(e.target.checked)); void saveNetworkingPreference({ userId: "", optIn: e.target.checked, linkedin: "" }).catch(() => undefined); }} /> Share my LinkedIn with attendees</label><span className="text-xs text-slate-500">You can change this anytime.</span></div><div className="mt-4 flex gap-2"><select value={review.rating} onChange={(e) => setReview({ ...review, rating: Number(e.target.value) })} className="rounded-lg border border-slate-700 bg-[#182032] px-2 py-2 text-sm text-white"><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select><input value={review.comment} onChange={(e) => setReview({ ...review, comment: e.target.value })} placeholder="Leave a review" className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white placeholder-slate-500" /><button type="button" onClick={handleReview} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Review</button></div></div>
+            <div className="mt-8 rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-2xl font-semibold text-white">Community</h2><div className="mt-3 flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={networking} onChange={(e) => { setNetworking(e.target.checked); const attendeeKey = localStorage.getItem("eventsphere-attendee-key") || crypto.randomUUID(); localStorage.setItem("eventsphere-attendee-key", attendeeKey); void saveNetworkingPreference(id, { attendeeKey, name: "EventSphere attendee", linkedin, optIn: e.target.checked }).then(() => getNetworkingAttendees(id)).then((data) => setNetworkers(data.attendees || [])).catch(() => undefined); }} /> Share my LinkedIn with attendees</label><input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="LinkedIn URL" className="rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white placeholder-slate-500" /><span className="text-xs text-slate-500">Only opted-in attendees can see this.</span></div><div className="mt-3 space-y-1">{networkers.map((person) => <p key={person.linkedin} className="text-xs text-slate-400">{person.name} · <a href={person.linkedin} target="_blank" rel="noreferrer" className="text-blue-300">LinkedIn</a></p>)}</div><div className="mt-4 flex gap-2"><select value={review.rating} onChange={(e) => setReview({ ...review, rating: Number(e.target.value) })} className="rounded-lg border border-slate-700 bg-[#182032] px-2 py-2 text-sm text-white"><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select><input value={review.comment} onChange={(e) => setReview({ ...review, comment: e.target.value })} placeholder="Leave a public review" className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white placeholder-slate-500" /><button type="button" onClick={handleReview} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Review</button></div>{event.endDate && new Date(event.endDate) < new Date() ? <div className="mt-4 border-t border-slate-800 pt-4"><p className="text-xs uppercase tracking-wider text-emerald-300">Post-event feedback</p><div className="mt-2 flex gap-2"><select value={feedback.rating} onChange={(e) => setFeedback({ ...feedback, rating: Number(e.target.value) })} className="rounded-lg border border-slate-700 bg-[#182032] px-2 py-2 text-sm text-white"><option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option><option value="2">2 stars</option><option value="1">1 star</option></select><input value={feedback.comment} onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })} placeholder="How was the event?" className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#182032] px-3 py-2 text-sm text-white placeholder-slate-500" /><button type="button" onClick={async () => { await submitFeedback(id, feedback); setFeedback({ rating: 5, comment: "" }); }} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Send feedback</button></div></div> : null}</div>
+
+            <div className="mt-4 rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4"><h2 className="heading-font text-xl font-semibold text-white">Public reviews</h2>{event.reviews?.length ? <div className="mt-3 space-y-2">{event.reviews.map((item, index) => <div key={`${item.createdAt}-${index}`} className="border-b border-slate-800 pb-2"><p className="text-sm text-amber-300">{"★".repeat(item.rating)}{"☆".repeat(5 - item.rating)}</p><p className="text-sm text-slate-300">{item.comment}</p></div>)}</div> : <p className="mt-2 text-sm text-slate-500">No public reviews yet.</p>}</div>
           </div>
 
           <div className="rounded-2xl border border-blue-500/20 bg-[#161e2e]/80 p-5 shadow-lg shadow-blue-500/5">
