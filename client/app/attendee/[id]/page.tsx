@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { completeCheckout, createCheckout, getNetworkingAttendees, getReviews, getSingleEvent, saveNetworkingPreference, submitFeedback, submitReview, toggleWishlist, verifyCheckout } from "@/lib/eventApi";
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 
 type TicketType = {
   name: string;
@@ -178,9 +179,7 @@ export default function EventDetailsPage() {
 
             <div className="flex items-start justify-between gap-4"><h1 className="heading-font mt-2 bg-gradient-to-r from-white via-blue-100 to-blue-500 bg-clip-text text-5xl font-bold tracking-tight text-transparent">{event.title}</h1><button type="button" onClick={handleWishlist} className="mt-3 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300">{isWishlisted ? "Saved" : "Save event"}</button></div>
 
-            <p className="mt-5 text-sm leading-7 text-slate-400">
-              {event.description}
-            </p>
+            <div className="prose prose-invert mt-5 max-w-none text-sm leading-7 text-slate-300 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:text-white [&_strong]:font-semibold [&_strong]:text-white [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-3"><ReactMarkdown>{event.description}</ReactMarkdown></div>
 
             <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="rounded-xl border border-slate-800/60 bg-[#161e2e]/60 p-4">
