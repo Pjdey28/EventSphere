@@ -12,6 +12,6 @@ export const uploadBanner = async (req, res) => {
     return res.status(201).json({ success: true, url: result.secure_url, publicId: result.public_id });
   } catch (error) {
     console.error("Cloudinary banner upload failed", error);
-    return res.status(502).json({ message: "Cloudinary banner upload failed", error: error.message });
+    return res.status(502).json({ message: "Cloudinary banner upload failed", error: error.message, cloudinaryCode: error.http_code || error.code || "unknown" });
   }
 };
