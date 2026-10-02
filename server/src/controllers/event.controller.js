@@ -375,7 +375,7 @@ export const generateDescription = async (req, res) => {
   if (process.env.GROQ_API_KEY) {
     const { default: Groq } = await import("groq-sdk");
     const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    const completion = await client.chat.completions.create({ model: "llama-3.1-8b-instant", messages: [{ role: "user", content: `Write a polished event description from these points: ${bullets.join("; ")}` }], temperature: 0.7 });
+    const completion = await client.chat.completions.create({ model: process.env.GROQ_MODEL || "openai/gpt-oss-20b", messages: [{ role: "user", content: `Write a polished event description from these points: ${bullets.join("; ")}` }], temperature: 0.7 });
     return res.json({ success: true, description: completion.choices[0]?.message?.content || bullets.join(" ") });
   }
   return res.json({ success: true, description: `${bullets.join(". ")}. Join us for a thoughtfully curated experience with practical takeaways, meaningful connections, and a welcoming community.` , schedule: sessions.slice().sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))) });
@@ -386,7 +386,7 @@ export const suggestSchedule = async (req, res) => {
   if (process.env.GROQ_API_KEY && sessions.length) {
     const { default: Groq } = await import("groq-sdk");
     const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    const completion = await client.chat.completions.create({ model: "llama-3.1-8b-instant", response_format: { type: "json_object" }, messages: [{ role: "user", content: `Order these conference sessions for speaker availability and audience flow. Return JSON with a sessions array containing the same objects in the recommended order and a reason string. Sessions: ${JSON.stringify(sessions)}` }] });
+    const completion = await client.chat.completions.create({ model: process.env.GROQ_MODEL || "openai/gpt-oss-20b", response_format: { type: "json_object" }, messages: [{ role: "user", content: `Order these conference sessions for speaker availability and audience flow. Return JSON with a sessions array containing the same objects in the recommended order and a reason string. Sessions: ${JSON.stringify(sessions)}` }] });
     const suggestion = JSON.parse(completion.choices[0]?.message?.content || "{}");
     return res.json({ success: true, sessions: suggestion.sessions || sessions, reason: suggestion.reason || "AI balanced speaker availability and audience flow." });
   }
